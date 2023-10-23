@@ -1,0 +1,88 @@
+-- Code your design here
+library IEEE;
+use IEEE.std_logic_1164.all;
+
+entity geladeira is
+    generic(FrequencyHz : integer := 10);
+    port (
+        -- botoes
+        gelar_toddynho : in bit;
+        
+        -- sensores
+        sensor_porta_aberta : in bit;
+        sensor_peso : in integer range 0 to 1023;  -- Sensor de peso da prateleira
+        temperatura_geladeira : in integer;
+        temperatura_freezer : buffer integer;
+        
+        -- alertas
+        alerta_porta_aberta : out bit;
+        recomendacao_fechar_freezer : out bit;
+        alerta_geladeira_vazia : out bit;  -- Alerta para ir ao mercado
+        alerta_erro_de_temperatura : out bit;
+        
+        -- controladores
+        modo_economico : out bit;
+        clock: in bit;
+    );
+end geladeira;
+
+architecture arquitetura of geladeira is
+	signal tick:    integer range 0 to FrequencyHz - 1 := 0;
+
+    signal tempo_porta_aberta : integer := 0;
+    signal tempo_porta_fechada : integer := 0;
+    
+begin
+    -- TEMPO PORTA ABERTA E FECHADA
+    process (sensor_porta_aberta, clock)
+    begin
+		if rising_edge(clock) then
+        	if tick = FrequencyHz - 1 then
+            	tick <= 0;
+                if sensor_porta_aberta = '1' then
+                    tempo_porta_aberta <= tempo_porta_aberta + 1;
+                    tempo_porta_fechada <= 0;
+                else
+                    tempo_porta_fechada <= tempo_porta_fechada + 1;
+                    tempo_porta_aberta <= 0;
+                end if;
+        	else
+                tick <= tick + 1;
+            end if;
+        end if;
+    end process;
+    alerta_porta_aberta <= '1' when tempo_porta_aberta > 29 else '0';
+    modo_economico <= '1' when tempo_porta_fechada > 59 else '0';
+
+    -- GELAR TODDYNHO
+    process (gelar_toddynho)
+    begin
+        if gelar_toddynho = '1' then
+            recomendacao_fechar_freezer <= '1';
+            temperatura_freezer <= 0;
+        else
+            recomendacao_fechar_freezer <= '0';
+        end if;
+    end process;
+
+    -- SENSOR DE PESO PARA ALERTA DE GELADEIRA VAZIA
+    process (sensor_peso)
+    begin
+        if sensor_peso < 1000 then
+            alerta_geladeira_vazia <= '1';
+        else
+            alerta_geladeira_vazia <= '0';
+        end if;
+    end process;
+    
+    -- SENSOR DE TEMPERATURA
+    process (temperatura_geladeira)
+    begin
+    	if (temperatura_geladeira >= 8 and temperatura_geladeira <= 10) then
+        	alerta_erro_de_temperatura <= '0';
+        else
+        	alerta_erro_de_temperatura <= '1';
+        end if;
+    end process;
+
+end arquitetura;
